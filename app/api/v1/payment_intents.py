@@ -129,8 +129,7 @@ async def update_source_transaction(
             detail=f"Payment intent not found: {intent_id}"
         )
     
-    # TODO: Trigger webhook for payment_intent.submitted
-    
+    # Webhook for payment_intent.submitted is automatically triggered by the service
     return intent
 
 
@@ -168,6 +167,5 @@ async def update_destination_transaction(
             detail=f"Payment intent not found: {intent_id}"
         )
     
-    # TODO: Trigger webhook for payment_intent.settled
-    
+    # Webhook for payment_intent.settled is automatically triggered by the service
     return intent
