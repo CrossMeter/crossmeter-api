@@ -13,7 +13,7 @@ class ProductType(str, Enum):
 
 class ProductCreate(BaseModel):
     """Schema for creating a new product."""
-    vendor_id: str = Field(..., description="Vendor identifier who owns this product")
+    vendor_id: Optional[str] = Field(None, description="Vendor identifier (will be set from path parameter)")
     name: str = Field(..., min_length=1, max_length=255, description="Product name")
     description: Optional[str] = Field(None, description="Product description")
     product_type: ProductType = Field(..., description="Type of product billing")
@@ -23,7 +23,6 @@ class ProductCreate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "vendor_id": "v_123",
                 "name": "Premium API Access",
                 "description": "Monthly access to premium API features",
                 "product_type": "subscription",
