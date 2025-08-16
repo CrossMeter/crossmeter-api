@@ -37,6 +37,7 @@ class VendorResponse(BaseModel):
     vendor_id: str = Field(..., description="Unique vendor identifier")
     name: str = Field(..., description="Vendor company name")
     email: EmailStr = Field(..., description="Vendor contact email")
+    api_key: Optional[str] = Field(None, description="API key for client SDK integration")
     webhook_url: Optional[str] = Field(None, description="Webhook URL for payment notifications")
     preferred_dest_chain_id: int = Field(..., description="Preferred destination chain ID")
     enabled_source_chains: List[int] = Field(..., description="Chain IDs that customers can pay from")

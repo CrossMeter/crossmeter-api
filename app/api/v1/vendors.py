@@ -167,3 +167,45 @@ async def update_vendor(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update vendor: {str(e)}"
         )
+
+
+@router.post(
+    "/{vendor_id}/regenerate-api-key",
+    response_model=Dict[str, str],
+    summary="Regenerate API Key",
+    description="Generate a new API key for the vendor"
+)
+async def regenerate_api_key(
+    vendor_id: str,
+    current_vendor: VendorResponse = Depends(get_current_vendor),
+    service: VendorService = Depends(get_vendor_service)
+) -> Dict[str, str]:
+    """
+    Regenerate API key for vendor.
+    
+    **Auth Required:** Must be the vendor requesting regeneration.
+    
+    **Returns:** New API key that can be used for client SDK integration.
+    """
+    try:
+        # Check if regenerating own API key
+        if current_vendor.vendor_id != vendor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only regenerate your own API key"
+            )
+            
+        new_api_key = await service.regenerate_api_key(vendor_id)
+        
+        return {"api_key": new_api_key}
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to regenerate API key: {str(e)}"
+        )

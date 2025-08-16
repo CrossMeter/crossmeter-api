@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Dict, Any, Optional
+import secrets
 from passlib.context import CryptContext
 from app.database.client import get_supabase_admin_client
 from app.schemas.vendor import VendorCreate, VendorResponse
@@ -13,14 +14,19 @@ class VendorService:
     def __init__(self):
         self.supabase = get_supabase_admin_client()
     
+    def generate_api_key(self) -> str:
+        """Generate a secure API key."""
+        return f"piaas_{secrets.token_urlsafe(32)}"
+    
     async def create_vendor(self, vendor_data: VendorCreate) -> VendorResponse:
         """Create a new vendor."""
         try:
             # Generate vendor ID
             vendor_id = f"v_{datetime.now().strftime('%Y%m%d%H%M%S')}"
             
-            # Hash password
+            # Hash password and generate API key
             password_hash = pwd_context.hash(vendor_data.password)
+            api_key = self.generate_api_key()
             
             # Prepare data for insertion
             insert_data = {
@@ -28,6 +34,7 @@ class VendorService:
                 "name": vendor_data.name,
                 "email": vendor_data.email,
                 "password_hash": password_hash,
+                "api_key": api_key,
                 "webhook_url": vendor_data.webhook_url,
                 "preferred_dest_chain_id": vendor_data.preferred_dest_chain_id,
                 "enabled_source_chains": vendor_data.enabled_source_chains,
@@ -47,10 +54,24 @@ class VendorService:
             created_at = self._parse_timestamp(vendor_row["created_at"])
             updated_at = self._parse_timestamp(vendor_row["updated_at"])
             
+            # Handle missing API key for existing vendors
+            api_key = vendor_row.get("api_key")
+            if not api_key:
+                # Generate and save API key for existing vendor
+                api_key = self.generate_api_key()
+                try:
+                    self.supabase.table("vendors").update({
+                        "api_key": api_key
+                    }).eq("vendor_id", vendor_row["vendor_id"]).execute()
+                except:
+                    # If update fails (e.g., column doesn't exist), continue with None
+                    api_key = None
+            
             return VendorResponse(
                 vendor_id=vendor_row["vendor_id"],
                 name=vendor_row["name"],
                 email=vendor_row["email"],
+                api_key=api_key,
                 webhook_url=vendor_row["webhook_url"],
                 preferred_dest_chain_id=vendor_row["preferred_dest_chain_id"],
                 enabled_source_chains=vendor_row["enabled_source_chains"],
@@ -77,10 +98,24 @@ class VendorService:
             created_at = self._parse_timestamp(vendor_row["created_at"])
             updated_at = self._parse_timestamp(vendor_row["updated_at"])
             
+            # Handle missing API key for existing vendors
+            api_key = vendor_row.get("api_key")
+            if not api_key:
+                # Generate and save API key for existing vendor
+                api_key = self.generate_api_key()
+                try:
+                    self.supabase.table("vendors").update({
+                        "api_key": api_key
+                    }).eq("vendor_id", vendor_row["vendor_id"]).execute()
+                except:
+                    # If update fails (e.g., column doesn't exist), continue with None
+                    api_key = None
+            
             return VendorResponse(
                 vendor_id=vendor_row["vendor_id"],
                 name=vendor_row["name"],
                 email=vendor_row["email"],
+                api_key=api_key,
                 webhook_url=vendor_row["webhook_url"],
                 preferred_dest_chain_id=vendor_row["preferred_dest_chain_id"],
                 enabled_source_chains=vendor_row["enabled_source_chains"],
@@ -114,10 +149,24 @@ class VendorService:
             created_at = self._parse_timestamp(vendor_row["created_at"])
             updated_at = self._parse_timestamp(vendor_row["updated_at"])
             
+            # Handle missing API key for existing vendors
+            api_key = vendor_row.get("api_key")
+            if not api_key:
+                # Generate and save API key for existing vendor
+                api_key = self.generate_api_key()
+                try:
+                    self.supabase.table("vendors").update({
+                        "api_key": api_key
+                    }).eq("vendor_id", vendor_row["vendor_id"]).execute()
+                except:
+                    # If update fails (e.g., column doesn't exist), continue with None
+                    api_key = None
+            
             return VendorResponse(
                 vendor_id=vendor_row["vendor_id"],
                 name=vendor_row["name"],
                 email=vendor_row["email"],
+                api_key=api_key,
                 webhook_url=vendor_row["webhook_url"],
                 preferred_dest_chain_id=vendor_row["preferred_dest_chain_id"],
                 enabled_source_chains=vendor_row["enabled_source_chains"],
@@ -129,6 +178,67 @@ class VendorService:
             
         except Exception as e:
             raise ValueError(f"Error updating vendor: {str(e)}")
+    
+    async def regenerate_api_key(self, vendor_id: str) -> str:
+        """Regenerate API key for a vendor."""
+        try:
+            new_api_key = self.generate_api_key()
+            
+            result = self.supabase.table("vendors").update({
+                "api_key": new_api_key
+            }).eq("vendor_id", vendor_id).execute()
+            
+            if not result.data:
+                raise ValueError(f"Vendor {vendor_id} not found")
+            
+            return new_api_key
+            
+        except Exception as e:
+            raise ValueError(f"Error regenerating API key: {str(e)}")
+    
+    async def get_vendor_by_api_key(self, api_key: str) -> Optional[VendorResponse]:
+        """Get vendor by API key."""
+        try:
+            result = self.supabase.table("vendors").select("*").eq("api_key", api_key).execute()
+            
+            if not result.data:
+                return None
+            
+            vendor_row = result.data[0]
+            
+            # Parse timestamps
+            created_at = self._parse_timestamp(vendor_row["created_at"])
+            updated_at = self._parse_timestamp(vendor_row["updated_at"])
+            
+            # Handle missing API key for existing vendors
+            api_key = vendor_row.get("api_key")
+            if not api_key:
+                # Generate and save API key for existing vendor
+                api_key = self.generate_api_key()
+                try:
+                    self.supabase.table("vendors").update({
+                        "api_key": api_key
+                    }).eq("vendor_id", vendor_row["vendor_id"]).execute()
+                except:
+                    # If update fails (e.g., column doesn't exist), continue with None
+                    api_key = None
+            
+            return VendorResponse(
+                vendor_id=vendor_row["vendor_id"],
+                name=vendor_row["name"],
+                email=vendor_row["email"],
+                api_key=api_key,
+                webhook_url=vendor_row["webhook_url"],
+                preferred_dest_chain_id=vendor_row["preferred_dest_chain_id"],
+                enabled_source_chains=vendor_row["enabled_source_chains"],
+                wallet_address=vendor_row["wallet_address"],
+                metadata=vendor_row["metadata"],
+                created_at=created_at,
+                updated_at=updated_at
+            )
+            
+        except Exception as e:
+            raise ValueError(f"Error fetching vendor by API key: {str(e)}")
     
     def _parse_timestamp(self, timestamp_str: str) -> datetime:
         """Parse Supabase timestamp with high precision."""

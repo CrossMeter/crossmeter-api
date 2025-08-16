@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     
     # Security
     secret_key: str = Field(
-        default="your-secret-key-change-this-in-production",
+        default_factory=lambda: os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production"),
         description="Secret key for JWT tokens"
     )
     access_token_expire_minutes: int = Field(

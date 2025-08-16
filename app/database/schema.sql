@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS vendors (
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    api_key TEXT UNIQUE NOT NULL,
     webhook_url TEXT,
     preferred_dest_chain_id INTEGER NOT NULL,
     enabled_source_chains INTEGER[] DEFAULT '{1,8453,84532,10,42161,137}',
