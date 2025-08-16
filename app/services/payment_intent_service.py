@@ -50,16 +50,20 @@ class PaymentIntentService:
         intent_id = f"pi_{uuid.uuid4().hex[:12]}"
         
         # Get vendor information to generate calldata
-        vendor_result = self.db.table("vendors").select("wallet_address, preferred_dest_chain_id").eq("vendor_id", payment_data.vendor_id).execute()
+        vendor_result = self.db.table("vendors").select("wallet_address, preferred_dest_chain_id, enabled_source_chains").eq("vendor_id", payment_data.vendor_id).execute()
         
         if not vendor_result.data:
             raise ValueError(f"Vendor not found: {payment_data.vendor_id}")
         
         vendor_data = vendor_result.data[0]
         vendor_wallet = vendor_data["wallet_address"]
+        enabled_source_chains = vendor_data.get("enabled_source_chains", [])
         
-        # TODO: Re-enable chain validation once enabled_source_chains column is added
-        # For now, just validate that chains are supported by our router
+        # Validate that the source chain is enabled for this vendor
+        if payment_data.src_chain_id not in enabled_source_chains:
+            raise ValueError(f"Source chain {payment_data.src_chain_id} is not enabled for vendor {payment_data.vendor_id}")
+        
+        # Validate that chains are supported by our router
         if not self.router_service.validate_chain_support(payment_data.src_chain_id, payment_data.dest_chain_id):
             raise ValueError(f"Chain combination not supported: {payment_data.src_chain_id} -> {payment_data.dest_chain_id}")
         
