@@ -7,6 +7,7 @@ class VendorCreate(BaseModel):
     """Schema for creating a new vendor."""
     name: str = Field(..., min_length=1, max_length=255, description="Vendor company name")
     email: EmailStr = Field(..., description="Vendor contact email")
+    password: str = Field(..., min_length=8, description="Password for vendor login")
     webhook_url: Optional[str] = Field(None, description="Webhook URL for payment notifications")
     preferred_dest_chain_id: int = Field(..., description="Preferred destination chain ID for receiving payments")
     enabled_source_chains: List[int] = Field(default=[1, 8453, 84532, 10, 42161, 137], description="Chain IDs that customers can pay from")

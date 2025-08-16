@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.vendor import VendorCreate, VendorResponse
 from app.services.vendor_service import VendorService
+from .auth import get_current_vendor
 
 router = APIRouter()
 
@@ -81,28 +82,25 @@ async def create_vendor(
 )
 async def get_vendor(
     vendor_id: str,
+    current_vendor: VendorResponse = Depends(get_current_vendor),
     service: VendorService = Depends(get_vendor_service)
 ) -> VendorResponse:
     """
     Retrieve vendor details by vendor ID.
     
-    Returns complete vendor information including:
-    - Company details and contact information
-    - Payment preferences (chains, wallet address)
-    - Webhook configuration
-    - Metadata and timestamps
+    **Auth Required:** Must be the vendor being requested.
     
     **Path Parameters:**
     - `vendor_id`: The unique vendor identifier (e.g., "v_123")
     """
     try:
-        vendor = await service.get_vendor(vendor_id)
-        if not vendor:
+        # Check if requesting own vendor details
+        if current_vendor.vendor_id != vendor_id:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Vendor {vendor_id} not found"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only access your own vendor details"
             )
-        return vendor
+        return current_vendor
     except HTTPException:
         raise
     except Exception as e:
@@ -121,30 +119,25 @@ async def get_vendor(
 async def update_vendor(
     vendor_id: str,
     update_data: VendorUpdate,
+    current_vendor: VendorResponse = Depends(get_current_vendor),
     service: VendorService = Depends(get_vendor_service)
 ) -> VendorResponse:
     """
     Update vendor settings and configuration.
     
-    This endpoint allows partial updates - only include fields you want to change.
-    All fields are optional in the update request.
-    
-    **Example Request:**
-    ```json
-    {
-        "webhook_url": "https://api.acme.com/webhooks/piaas-v2",
-        "enabled_source_chains": [1, 8453, 84532, 10, 42161, 137, 56],
-        "metadata": {
-            "industry": "fintech",
-            "plan": "enterprise"
-        }
-    }
-    ```
+    **Auth Required:** Must be the vendor being updated.
     
     **Path Parameters:**
     - `vendor_id`: The unique vendor identifier (e.g., "v_123")
     """
     try:
+        # Check if updating own vendor details
+        if current_vendor.vendor_id != vendor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only update your own vendor details"
+            )
+            
         # Convert Pydantic model to dict, excluding None values
         update_dict = update_data.model_dump(exclude_none=True)
         

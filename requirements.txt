@@ -37,7 +37,7 @@ websockets==13.0
 # Security and auth
 python-jose==3.3.0
 python-multipart==0.0.6
-passlib==1.7.4
+passlib[bcrypt]==1.7.4
 cryptography==45.0.6
 PyJWT==2.10.1
 

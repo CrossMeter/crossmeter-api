@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Dict, Any, Optional
+from passlib.context import CryptContext
 from app.database.client import get_supabase_admin_client
 from app.schemas.vendor import VendorCreate, VendorResponse
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class VendorService:
@@ -16,11 +19,15 @@ class VendorService:
             # Generate vendor ID
             vendor_id = f"v_{datetime.now().strftime('%Y%m%d%H%M%S')}"
             
+            # Hash password
+            password_hash = pwd_context.hash(vendor_data.password)
+            
             # Prepare data for insertion
             insert_data = {
                 "vendor_id": vendor_id,
                 "name": vendor_data.name,
                 "email": vendor_data.email,
+                "password_hash": password_hash,
                 "webhook_url": vendor_data.webhook_url,
                 "preferred_dest_chain_id": vendor_data.preferred_dest_chain_id,
                 "enabled_source_chains": vendor_data.enabled_source_chains,

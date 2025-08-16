@@ -14,6 +14,7 @@ from .customer import CustomerCreate, CustomerResponse
 from .vendor import VendorCreate, VendorResponse
 from .product import ProductCreate, ProductResponse
 from .webhook import WebhookPayload
+from .auth import LoginRequest, AuthResponse, TokenData
 
 __all__ = [
     # Payment Intent schemas
@@ -35,4 +36,8 @@ __all__ = [
     "ProductResponse",
     # Webhook schemas
     "WebhookPayload",
+    # Auth schemas
+    "LoginRequest",
+    "AuthResponse", 
+    "TokenData",
 ]

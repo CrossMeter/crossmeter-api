@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.database.client import get_supabase_admin_client
 from app.schemas.payment_intent import PaymentIntentResponse, PaymentIntentStatus
+from .auth import get_current_vendor
 
 router = APIRouter()
 
@@ -53,6 +54,7 @@ async def list_vendor_payment_intents(
     status_filter: Optional[PaymentIntentStatus] = Query(None, description="Filter by payment status"),
     limit: int = Query(default=50, le=100, description="Maximum number of payment intents to return"),
     offset: int = Query(default=0, ge=0, description="Number of payment intents to skip"),
+    current_vendor = Depends(get_current_vendor),
     supabase=Depends(get_supabase_client)
 ) -> List[Dict[str, Any]]:
     """
@@ -74,6 +76,13 @@ async def list_vendor_payment_intents(
     - `vendor_id`: The unique vendor identifier (e.g., "v_123")
     """
     try:
+        # Check if accessing own vendor's payment history
+        if current_vendor.vendor_id != vendor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only access your own payment history"
+            )
+            
         # Build query
         query = (supabase
                 .table("payment_intents")
@@ -138,6 +147,7 @@ async def list_vendor_payment_intents(
 async def get_vendor_analytics(
     vendor_id: str = Path(..., description="Vendor ID"),
     days: int = Query(default=30, ge=1, le=365, description="Number of days to include in analytics"),
+    current_vendor = Depends(get_current_vendor),
     supabase=Depends(get_supabase_client)
 ) -> AnalyticsSummary:
     """
@@ -180,6 +190,13 @@ async def get_vendor_analytics(
     ```
     """
     try:
+        # Check if accessing own vendor's analytics
+        if current_vendor.vendor_id != vendor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only access your own analytics"
+            )
+            
         # Calculate date range
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)

@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.product import ProductCreate, ProductResponse, ProductType
 from app.services.product_service import ProductService
+from .auth import get_current_vendor
 
 router = APIRouter()
 
@@ -32,6 +33,7 @@ def get_product_service() -> ProductService:
 async def create_product(
     vendor_id: str = Path(..., description="Vendor ID"),
     product_data: ProductCreate = ...,
+    current_vendor = Depends(get_current_vendor),
     service: ProductService = Depends(get_product_service)
 ) -> ProductResponse:
     """
@@ -61,6 +63,13 @@ async def create_product(
     ```
     """
     try:
+        # Check if creating product for own vendor
+        if current_vendor.vendor_id != vendor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only create products for your own vendor"
+            )
+            
         # Override the vendor_id in product_data with the path parameter
         product_data.vendor_id = vendor_id
         return await service.create_product(product_data)
@@ -84,6 +93,7 @@ async def create_product(
 )
 async def list_vendor_products(
     vendor_id: str = Path(..., description="Vendor ID"),
+    current_vendor = Depends(get_current_vendor),
     service: ProductService = Depends(get_product_service)
 ) -> List[ProductResponse]:
     """
@@ -99,6 +109,13 @@ async def list_vendor_products(
     - Empty array if vendor has no products
     """
     try:
+        # Check if listing products for own vendor
+        if current_vendor.vendor_id != vendor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only list products for your own vendor"
+            )
+            
         return await service.list_vendor_products(vendor_id)
     except ValueError as e:
         raise HTTPException(
