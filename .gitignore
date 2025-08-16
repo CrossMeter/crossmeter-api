@@ -1,0 +1,247 @@
+# PIaaS Backend - .gitignore
+
+# Doc Files
+API_USAGE_GUIDE.md
+PROJECT_SUMMARY.md
+
+# Environment Variables
+.env
+.env.local
+.env.production
+.env.staging
+environment.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+pyvenv.cfg
+
+# FastAPI / Uvicorn
+*.log
+logs/
+access.log
+error.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+local.db
+test.db
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+.nox/
+htmlcov/
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Documentation
+docs/_build/
+.readthedocs.yml
+
+# Temporary Files
+*.tmp
+*.temp
+temp/
+tmp/
+.tmp/
+
+# OS Generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Redis
+dump.rdb
+*.rdb
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Local Development Files
+test_*.py
+temp_*.py
+scratch.py
+playground.py
+debug.py
+
+# Application Specific
+uploads/
+downloads/
+static/media/
+media/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Certificate files (if any)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Local configuration
+local_settings.py
+local_config.py
+
+# Package files
+*.tar.gz
+*.zip
+*.rar
+
+# Node modules (if you add any frontend tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker (if you add containerization later)
+Dockerfile.local
+docker-compose.override.yml
+.dockerignore
+
+# Monitoring and profiling
+*.prof
+.profiling/
+
+# Cache directories
+.cache/
+__pycache__/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Local test data
+test_data_local.py
+local_test.py
+
+# Security
+secrets.json
+credentials.json
+service-account.json
+
+# Misc
+*.pid
+.sass-cache/
+connect.lock
+typings/
+
+# MacOS
+*.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
