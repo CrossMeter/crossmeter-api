@@ -142,6 +142,10 @@ class PaymentIntentService:
         """
         Complete a payment intent transaction with full transaction details.
         
+        This method handles both successful and failed transactions:
+        - If status is 'settled': Payment succeeded, intent is complete
+        - If status is 'failed': Payment failed, user can retry with same intent
+        
         Args:
             intent_id: Payment intent identifier
             transaction_update: Transaction completion data
@@ -149,6 +153,19 @@ class PaymentIntentService:
         Returns:
             Updated PaymentIntentResponse or None if not found
         """
+        # Validate that status is either settled or failed
+        if transaction_update.payment_status not in [PaymentIntentStatus.SETTLED, PaymentIntentStatus.FAILED]:
+            raise ValueError(f"Invalid payment status: {transaction_update.payment_status}. Must be 'settled' or 'failed'")
+        
+        # Get current payment intent to check current status
+        current_intent = await self.get_payment_intent(intent_id)
+        if not current_intent:
+            return None
+        
+        # Allow updates from 'created' or 'failed' status (enabling retries)
+        if current_intent.status not in [PaymentIntentStatus.CREATED, PaymentIntentStatus.FAILED]:
+            raise ValueError(f"Cannot update payment intent with status '{current_intent.status}'. Only 'created' or 'failed' intents can be updated.")
+        
         # Update the record
         update_data = {
             "transaction_hash": transaction_update.transaction_hash,

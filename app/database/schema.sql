@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS payment_intents (
     price_usdc_minor BIGINT NOT NULL CHECK (price_usdc_minor > 0),
     destination_chain_id INTEGER NOT NULL,
     destination_address TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'submitted', 'settled')),
+    status TEXT NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'settled', 'failed')),
     source_chain_id INTEGER,
     source_address TEXT,
     transaction_hash TEXT,

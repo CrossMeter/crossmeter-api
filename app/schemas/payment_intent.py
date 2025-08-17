@@ -7,9 +7,8 @@ from pydantic import BaseModel, Field, ConfigDict
 class PaymentIntentStatus(str, Enum):
     """Payment intent status enum."""
     CREATED = "created"
-    AWAITING_USER_TX = "awaiting_user_tx"
-    SUBMITTED = "submitted"
     SETTLED = "settled"
+    FAILED = "failed"
 
 
 class RouterInfo(BaseModel):
@@ -76,7 +75,7 @@ class PaymentIntentResponse(BaseModel):
 class TransactionCompleteUpdate(BaseModel):
     """Schema for completing a payment intent transaction."""
     transaction_hash: str = Field(..., min_length=66, max_length=66, description="Transaction hash (0x prefixed)")
-    payment_status: PaymentIntentStatus = Field(..., description="Payment status (submitted or settled)")
+    payment_status: PaymentIntentStatus = Field(..., description="Payment status (settled or failed)")
     source_chain_id: int = Field(..., description="Source chain ID where payment was made")
     source_address: str = Field(..., min_length=42, max_length=42, description="Source address that made the payment (0x prefixed)")
     

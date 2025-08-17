@@ -107,13 +107,26 @@ async def complete_transaction(
     Complete payment intent with transaction details.
     
     Call this endpoint when the transaction is completed to update the payment intent
-    with all transaction details.
+    with all transaction details. Supports both successful and failed transactions:
     
-    **Example Request:**
+    - **settled**: Payment succeeded, intent is complete
+    - **failed**: Payment failed, user can retry with same intent_id
+    
+    **Example Success:**
     ```json
     {
         "transaction_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
         "payment_status": "settled",
+        "source_chain_id": 84532,
+        "source_address": "0x742d35Cc6635C0532925a3b8D19dac9dd9bf9876"
+    }
+    ```
+    
+    **Example Failure:**
+    ```json
+    {
+        "transaction_hash": "0xfailed123456789abcdef123456789abcdef123456789abcdef123456789abcdef",
+        "payment_status": "failed",
         "source_chain_id": 84532,
         "source_address": "0x742d35Cc6635C0532925a3b8D19dac9dd9bf9876"
     }
