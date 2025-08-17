@@ -2,7 +2,7 @@ from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.schemas.auth import LoginRequest, AuthResponse, TokenData
+from app.schemas.auth import LoginRequest, AuthResponse, TokenData, WalletLoginRequest, WalletAuthResponse
 from app.schemas.vendor import VendorCreate, VendorResponse
 from app.services.auth_service import AuthService
 from app.services.vendor_service import VendorService
@@ -106,6 +106,37 @@ async def login(
     return AuthResponse(
         access_token=access_token,
         token_type="bearer",
+        vendor_id=vendor_id
+    )
+
+
+@router.post(
+    "/login/wallet",
+    response_model=WalletAuthResponse,
+    summary="Wallet-based Login",
+    description="Authenticate vendor by wallet address and return JWT token"
+)
+async def login_with_wallet(
+    login_data: WalletLoginRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+) -> WalletAuthResponse:
+    """Login vendor with wallet address and return JWT token."""
+    vendor_id = await auth_service.authenticate_vendor_by_wallet(login_data.walletAddress)
+    
+    if not vendor_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No vendor found with this wallet address",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=30)
+    access_token = auth_service.create_access_token(
+        data={"sub": vendor_id}, expires_delta=access_token_expires
+    )
+    
+    return WalletAuthResponse(
+        access_token=access_token,
         vendor_id=vendor_id
     )
 

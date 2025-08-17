@@ -48,6 +48,29 @@ class AuthService:
         except Exception:
             return None
     
+    async def authenticate_vendor_by_wallet(self, wallet_address: str) -> Optional[str]:
+        """Authenticate vendor by wallet address and return vendor_id if valid."""
+        try:
+            # First check if user exists
+            user_result = self.supabase.table("users").select("id").eq("wallet_address", wallet_address).execute()
+            
+            if not user_result.data:
+                return None
+            
+            user_id = user_result.data[0]["id"]
+            
+            # Then check if vendor exists for this user
+            vendor_result = self.supabase.table("vendors").select("vendor_id").eq("user_id", user_id).execute()
+            
+            if not vendor_result.data:
+                return None
+            
+            vendor = vendor_result.data[0]
+            return vendor["vendor_id"]
+            
+        except Exception:
+            return None
+    
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """Create JWT access token."""
         to_encode = data.copy()

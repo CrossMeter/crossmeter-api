@@ -4,22 +4,38 @@
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    wallet_address TEXT UNIQUE NOT NULL CHECK (LENGTH(wallet_address) = 42),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Vendors table
 CREATE TABLE IF NOT EXISTS vendors (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     vendor_id TEXT UNIQUE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
+    password_hash TEXT, -- Made optional for wallet-based authentication
     api_key TEXT UNIQUE NOT NULL,
     webhook_url TEXT,
     preferred_dest_chain_id INTEGER NOT NULL,
     enabled_source_chains INTEGER[] DEFAULT '{1,8453,84532,10,42161,137}',
-    wallet_address TEXT NOT NULL CHECK (LENGTH(wallet_address) = 42),
+    wallet_address TEXT UNIQUE CHECK (LENGTH(wallet_address) = 42),
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add unique constraint on wallet_address for wallet-based authentication
+ALTER TABLE vendors ADD CONSTRAINT IF NOT EXISTS vendors_wallet_address_unique UNIQUE (wallet_address);
+
+-- Add index for wallet address lookups
+CREATE INDEX IF NOT EXISTS idx_vendors_wallet_address ON vendors(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address);
 
 -- Products table
 CREATE TABLE IF NOT EXISTS products (

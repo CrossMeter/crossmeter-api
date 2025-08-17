@@ -113,6 +113,16 @@ class Settings(BaseSettings):
     db_pool_size: int = Field(default=10, description="Database connection pool size")
     db_max_overflow: int = Field(default=20, description="Database max overflow connections")
     
+    # Dynamic.xyz Configuration
+    dynamic_environment_id: Optional[str] = Field(
+        default=None,
+        description="Dynamic.xyz environment ID"
+    )
+    dynamic_api_base_url: Optional[str] = Field(
+        default="https://app.dynamic.xyz",
+        description="Dynamic.xyz API base URL"
+    )
+    
     @property
     def is_development(self) -> bool:
         return self.environment.lower() == "development"

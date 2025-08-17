@@ -8,6 +8,7 @@ from .products import router as products_router
 from .analytics import router as analytics_router
 from .auth import router as auth_router
 from .client import router as client_router
+from .users import router as users_router
 
 api_router = APIRouter()
 
@@ -34,6 +35,13 @@ api_router.include_router(
     router_router,
     prefix="/router",
     tags=["router"]
+)
+
+# User management endpoints
+api_router.include_router(
+    users_router,
+    prefix="/users",
+    tags=["users"]
 )
 
 # Vendor management endpoints
