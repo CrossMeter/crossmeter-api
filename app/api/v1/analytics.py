@@ -88,8 +88,7 @@ async def list_vendor_payment_intents(
                 .table("payment_intents")
                 .select("""
                     *,
-                    products!inner(name, product_type),
-                    customers(email)
+                    products!inner(name, product_type)
                 """)
                 .eq("vendor_id", vendor_id)
                 .order("created_at", desc=True)
@@ -109,21 +108,18 @@ async def list_vendor_payment_intents(
             updated_at = _parse_timestamp(row["updated_at"])
             
             payment_intents.append({
-                "intent_id": row["id"],
+                "intent_id": row["intent_id"],
                 "status": row["status"],
-                "amount_usdc_minor": row["amount_usdc_minor"],
-                "src_chain_id": row["src_chain_id"],
-                "dest_chain_id": row["dest_chain_id"],
-                "src_tx_hash": row["src_tx_hash"],
-                "dest_tx_hash": row["dest_tx_hash"],
+                "amount_usdc_minor": row["price_usdc_minor"],
+                "src_chain_id": row["source_chain_id"],
+                "dest_chain_id": row["destination_chain_id"],
+                "src_tx_hash": row["transaction_hash"],
+                "dest_tx_hash": row["transaction_hash"],  # Using same hash for both since schema only has one
+                "transaction_hash": row["transaction_hash"],
                 "product": {
                     "product_id": row["product_id"],
                     "name": row["products"]["name"] if row["products"] else None,
                     "type": row["products"]["product_type"] if row["products"] else None
-                },
-                "customer": {
-                    "customer_id": row["customer_id"],
-                    "email": row["customers"]["email"] if row["customers"] else None
                 },
                 "created_at": created_at.isoformat(),
                 "updated_at": updated_at.isoformat()
