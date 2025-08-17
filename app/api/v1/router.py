@@ -3,6 +3,8 @@ from typing import Dict, Any, List, Optional
 
 from app.services.router_service import RouterService
 from app.services.contract_interface import ChainConfig, PaymentType
+from app.services.product_service import ProductService
+from app.services.vendor_service import VendorService
 
 router = APIRouter()
 
@@ -254,3 +256,77 @@ async def validate_chain_combination(
         "is_cross_chain": src_chain_id != dest_chain_id,
         "bridge_fee_bps": src_config.get("bridge_fee_bps", 0) if src_chain_id != dest_chain_id else 0
     }
+
+
+@router.get(
+    "/vendor/{vendor_id}/products",
+    response_model=Dict[str, Any],
+    summary="Get Vendor Products",
+    description="Retrieve vendor information and all products for a specific vendor by vendor ID"
+)
+async def get_vendor_products(vendor_id: str) -> Dict[str, Any]:
+    """
+    Get vendor information and all products for a specific vendor.
+    
+    **Path Parameters:**
+    - `vendor_id`: The vendor identifier (e.g., "v_20241201120000")
+    
+    **Returns:**
+    Vendor information including wallet address, preferred chain, and list of products.
+    
+    **Use this endpoint to display vendor products without authentication.**
+    """
+    try:
+        vendor_service = VendorService()
+        product_service = ProductService()
+        
+        # Get vendor information
+        vendor = await vendor_service.get_vendor(vendor_id)
+        if not vendor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Vendor {vendor_id} not found"
+            )
+        
+        # Get vendor products
+        products = await product_service.list_vendor_products(vendor_id)
+        
+        # Convert ProductResponse objects to dictionaries
+        product_list = []
+        for product in products:
+            product_list.append({
+                "product_id": product.product_id,
+                "name": product.name,
+                "description": product.description,
+                "product_type": product.product_type.value,
+                "default_amount_usdc_minor": product.default_amount_usdc_minor,
+                "created_at": product.created_at.isoformat() if product.created_at else None
+            })
+        
+        # Get preferred chain name
+        preferred_chain_name = None
+        if vendor.preferred_dest_chain_id:
+            chain_config = ChainConfig.get_chain_config(vendor.preferred_dest_chain_id)
+            if chain_config:
+                preferred_chain_name = chain_config.get("name")
+        
+        return {
+            "vendor_id": vendor.vendor_id,
+            "vendor_name": vendor.name,
+            "wallet_address": vendor.wallet_address,
+            "preferred_dest_chain_id": vendor.preferred_dest_chain_id,
+            "preferred_chain_name": preferred_chain_name,
+            "enabled_source_chains": vendor.enabled_source_chains,
+            "products": product_list
+        }
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve vendor information: {str(e)}"
+        )
