@@ -27,20 +27,12 @@ class PaymentIntentCreate(BaseModel):
     """Schema for creating a new payment intent."""
     vendor_id: str = Field(..., description="Vendor identifier")
     product_id: str = Field(..., description="Product identifier") 
-    src_chain_id: int = Field(..., description="Source chain ID (where customer pays from)")
-    dest_chain_id: int = Field(..., description="Destination chain ID (where vendor receives)")
-    amount_usdc_minor: int = Field(..., gt=0, description="Amount in USDC minor units (1 USDC = 1,000,000 minor units)")
-    customer_email: Optional[str] = Field(None, description="Optional customer email")
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "vendor_id": "v_123",
-                "product_id": "p_abc", 
-                "src_chain_id": 84532,
-                "dest_chain_id": 8453,
-                "amount_usdc_minor": 990000,
-                "customer_email": "alice@example.com"
+                "product_id": "p_abc"
             }
         }
     )
@@ -52,13 +44,12 @@ class PaymentIntentResponse(BaseModel):
     vendor_id: str = Field(..., description="Vendor identifier")
     product_id: str = Field(..., description="Product identifier")
     status: PaymentIntentStatus = Field(..., description="Current payment intent status")
-    src_chain_id: int = Field(..., description="Source chain ID")
-    dest_chain_id: int = Field(..., description="Destination chain ID")
-    amount_usdc_minor: int = Field(..., description="Amount in USDC minor units")
-    customer_email: Optional[str] = Field(None, description="Customer email if provided")
-    src_tx_hash: Optional[str] = Field(None, description="Source chain transaction hash")
-    dest_tx_hash: Optional[str] = Field(None, description="Destination chain transaction hash")
-    router: RouterInfo = Field(..., description="Router contract information")
+    price_usdc_minor: int = Field(..., description="Price to be paid in USDC minor units")
+    destination_chain_id: int = Field(..., description="Destination chain ID where vendor receives payment")
+    destination_address: str = Field(..., description="Destination address where vendor receives payment")
+    source_chain_id: Optional[int] = Field(None, description="Source chain ID (set when transaction is completed)")
+    source_address: Optional[str] = Field(None, description="Source address (set when transaction is completed)")
+    transaction_hash: Optional[str] = Field(None, description="Transaction hash (set when transaction is completed)")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     
@@ -68,19 +59,13 @@ class PaymentIntentResponse(BaseModel):
                 "intent_id": "pi_f83c",
                 "vendor_id": "v_123",
                 "product_id": "p_abc",
-                "status": "awaiting_user_tx",
-                "src_chain_id": 84532,
-                "dest_chain_id": 8453,
-                "amount_usdc_minor": 990000,
-                "customer_email": "alice@example.com",
-                "src_tx_hash": None,
-                "dest_tx_hash": None,
-                "router": {
-                    "address": "0xROUTER...",
-                    "chain_id": 84532,
-                    "function": "createPayment",
-                    "calldata": "0xabcdef..."
-                },
+                "status": "created",
+                "price_usdc_minor": 990000,
+                "destination_chain_id": 8453,
+                "destination_address": "0x742d35Cc6635C0532925a3b8D19dac9dd9bf1234",
+                "source_chain_id": None,
+                "source_address": None,
+                "transaction_hash": None,
                 "created_at": "2024-01-01T00:00:00Z",
                 "updated_at": "2024-01-01T00:00:00Z"
             }
@@ -88,14 +73,20 @@ class PaymentIntentResponse(BaseModel):
     )
 
 
-class TransactionHashUpdate(BaseModel):
-    """Schema for updating transaction hash."""
-    tx_hash: str = Field(..., min_length=66, max_length=66, description="Transaction hash (0x prefixed)")
+class TransactionCompleteUpdate(BaseModel):
+    """Schema for completing a payment intent transaction."""
+    transaction_hash: str = Field(..., min_length=66, max_length=66, description="Transaction hash (0x prefixed)")
+    payment_status: PaymentIntentStatus = Field(..., description="Payment status (submitted or settled)")
+    source_chain_id: int = Field(..., description="Source chain ID where payment was made")
+    source_address: str = Field(..., min_length=42, max_length=42, description="Source address that made the payment (0x prefixed)")
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "tx_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                "transaction_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                "payment_status": "settled",
+                "source_chain_id": 84532,
+                "source_address": "0x742d35Cc6635C0532925a3b8D19dac9dd9bf9876"
             }
         }
     )

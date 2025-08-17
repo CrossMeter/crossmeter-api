@@ -4,7 +4,7 @@ from typing import Optional
 from app.schemas.payment_intent import (
     PaymentIntentCreate,
     PaymentIntentResponse,
-    TransactionHashUpdate
+    TransactionCompleteUpdate
 )
 from app.services.payment_intent_service import PaymentIntentService
 
@@ -31,20 +31,17 @@ async def create_payment_intent(
     Create a new payment intent.
     
     This endpoint:
-    1. Validates the vendor, product, and chain combination
-    2. Generates router contract calldata for the payment
-    3. Creates a payment intent record in awaiting_user_tx status
-    4. Returns the intent with router information for wallet execution
+    1. Validates the vendor and product exist and are related
+    2. Gets price from product's default_amount_usdc_minor
+    3. Gets destination chain and address from vendor's preferences
+    4. Creates a payment intent record in 'created' status
+    5. Returns the intent with price and destination info for user
     
     **Example Request:**
     ```json
     {
         "vendor_id": "v_123",
-        "product_id": "p_abc",
-        "src_chain_id": 84532,
-        "dest_chain_id": 8453,
-        "amount_usdc_minor": 990000,
-        "customer_email": "alice@example.com"
+        "product_id": "p_abc"
     }
     ```
     """
@@ -96,32 +93,33 @@ async def get_payment_intent(
 
 
 @router.post(
-    "/{intent_id}/tx/source",
+    "/{intent_id}/complete",
     response_model=PaymentIntentResponse,
-    summary="Update Source Transaction Hash",
-    description="Report the source chain transaction hash after wallet broadcast"
+    summary="Complete Transaction",
+    description="Complete the payment intent with transaction details"
 )
-async def update_source_transaction(
+async def complete_transaction(
     intent_id: str,
-    tx_update: TransactionHashUpdate,
+    transaction_update: TransactionCompleteUpdate,
     service: PaymentIntentService = Depends(get_payment_intent_service)
 ) -> PaymentIntentResponse:
     """
-    Update payment intent with source transaction hash.
+    Complete payment intent with transaction details.
     
-    Call this endpoint after the user broadcasts the transaction on the source chain.
-    This moves the payment intent status from `awaiting_user_tx` to `submitted`.
+    Call this endpoint when the transaction is completed to update the payment intent
+    with all transaction details.
     
     **Example Request:**
     ```json
     {
-        "tx_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        "transaction_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+        "payment_status": "settled",
+        "source_chain_id": 84532,
+        "source_address": "0x742d35Cc6635C0532925a3b8D19dac9dd9bf9876"
     }
     ```
-    
-    This will trigger a `payment_intent.submitted` webhook to the vendor.
     """
-    intent = await service.update_source_transaction(intent_id, tx_update)
+    intent = await service.complete_transaction(intent_id, transaction_update)
     
     if not intent:
         raise HTTPException(
@@ -129,43 +127,4 @@ async def update_source_transaction(
             detail=f"Payment intent not found: {intent_id}"
         )
     
-    # Webhook for payment_intent.submitted is automatically triggered by the service
-    return intent
-
-
-@router.post(
-    "/{intent_id}/tx/destination",
-    response_model=PaymentIntentResponse,
-    summary="Update Destination Transaction Hash",
-    description="Report the destination chain transaction hash when payment is settled"
-)
-async def update_destination_transaction(
-    intent_id: str,
-    tx_update: TransactionHashUpdate,
-    service: PaymentIntentService = Depends(get_payment_intent_service)
-) -> PaymentIntentResponse:
-    """
-    Update payment intent with destination transaction hash.
-    
-    This is optional and typically called when the vendor confirms
-    receipt of payment on the destination chain. This moves the status to `settled`.
-    
-    **Example Request:**
-    ```json
-    {
-        "tx_hash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-    }
-    ```
-    
-    This will trigger a `payment_intent.settled` webhook to the vendor.
-    """
-    intent = await service.update_destination_transaction(intent_id, tx_update)
-    
-    if not intent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Payment intent not found: {intent_id}"
-        )
-    
-    # Webhook for payment_intent.settled is automatically triggered by the service
     return intent

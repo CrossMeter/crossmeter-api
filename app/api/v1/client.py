@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.vendor import VendorResponse
 from app.schemas.product import ProductResponse
-from app.schemas.payment_intent import PaymentIntentCreate, PaymentIntentResponse, TransactionHashUpdate
+from app.schemas.payment_intent import PaymentIntentCreate, PaymentIntentResponse
 from app.services.vendor_service import VendorService
 from app.services.product_service import ProductService
 from app.services.payment_intent_service import PaymentIntentService
@@ -36,9 +36,6 @@ async def get_vendor_by_api_key(
 class ClientPaymentRequest(BaseModel):
     """Schema for client payment request."""
     product_id: str = Field(..., description="Product ID to charge for")
-    amount_usdc_minor: Optional[int] = Field(None, description="Override amount in USDC minor units")
-    customer_email: Optional[str] = Field(None, description="Customer email address")
-    src_chain_id: int = Field(..., description="Chain ID customer is paying from")
     metadata: Optional[dict] = Field(None, description="Additional payment metadata")
 
 
@@ -183,9 +180,6 @@ async def create_payment_intent(
     ```json
     {
         "product_id": "p_abc123",
-        "amount_usdc_minor": 9990000,
-        "customer_email": "customer@example.com",
-        "src_chain_id": 84532,
         "metadata": {"order_id": "ord_123"}
     }
     ```
@@ -204,24 +198,10 @@ async def create_payment_intent(
                 detail="Product not found"
             )
         
-        # Use product's default amount if not specified
-        amount = payment_request.amount_usdc_minor
-        if amount is None:
-            if product.default_amount_usdc_minor is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Amount required - product has no default amount"
-                )
-            amount = product.default_amount_usdc_minor
-        
-        # Create payment intent data
+        # Create payment intent data (simplified - only vendor_id and product_id needed)
         payment_data = PaymentIntentCreate(
             vendor_id=vendor.vendor_id,
-            product_id=payment_request.product_id,
-            src_chain_id=payment_request.src_chain_id,
-            dest_chain_id=vendor.preferred_dest_chain_id,
-            amount_usdc_minor=amount,
-            customer_email=payment_request.customer_email
+            product_id=payment_request.product_id
         )
         
         # Create payment intent
@@ -291,7 +271,7 @@ async def get_payment_status(
 )
 async def submit_transaction_hash(
     intent_id: str,
-    tx_data: TransactionHashUpdate,
+    tx_data: dict,
     vendor: VendorResponse = Depends(get_vendor_by_api_key),
     payment_service: PaymentIntentService = Depends(lambda: PaymentIntentService())
 ) -> PaymentIntentResponse:
@@ -328,8 +308,11 @@ async def submit_transaction_hash(
                 detail="Payment intent not found"
             )
         
-        # Update with source transaction hash
-        updated_payment = await payment_service.update_source_transaction(intent_id, tx_data.tx_hash)
+        # This endpoint is deprecated - use complete transaction instead
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This endpoint is deprecated. Use /complete endpoint instead."
+        )
         
         return updated_payment
         
@@ -355,7 +338,7 @@ async def submit_transaction_hash(
 )
 async def settle_payment(
     intent_id: str,
-    tx_data: TransactionHashUpdate,
+    tx_data: dict,
     vendor: VendorResponse = Depends(get_vendor_by_api_key),
     payment_service: PaymentIntentService = Depends(lambda: PaymentIntentService())
 ) -> PaymentIntentResponse:
@@ -391,8 +374,11 @@ async def settle_payment(
                 detail="Payment intent not found"
             )
         
-        # Update with destination transaction hash
-        updated_payment = await payment_service.update_destination_transaction(intent_id, tx_data.tx_hash)
+        # This endpoint is deprecated - use complete transaction instead
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This endpoint is deprecated. Use /complete endpoint instead."
+        )
         
         return updated_payment
         

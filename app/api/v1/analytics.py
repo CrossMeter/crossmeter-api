@@ -223,8 +223,8 @@ async def get_vendor_analytics(
         
         # Calculate revenue (only for successful payments)
         successful_payment_amounts = [
-            p["amount_usdc_minor"] for p in payments 
-            if p["status"] in ["submitted", "settled"] and p["amount_usdc_minor"]
+            p["price_usdc_minor"] for p in payments 
+            if p["status"] in ["submitted", "settled"] and p["price_usdc_minor"]
         ]
         total_revenue = sum(successful_payment_amounts)
         average_payment = sum(successful_payment_amounts) / len(successful_payment_amounts) if successful_payment_amounts else 0
@@ -232,7 +232,7 @@ async def get_vendor_analytics(
         # Revenue by product
         revenue_by_product = {}
         for payment in payments:
-            if payment["status"] in ["submitted", "settled"] and payment["amount_usdc_minor"]:
+            if payment["status"] in ["submitted", "settled"] and payment["price_usdc_minor"]:
                 product_id = payment["product_id"]
                 if product_id not in revenue_by_product:
                     revenue_by_product[product_id] = {
@@ -241,7 +241,7 @@ async def get_vendor_analytics(
                         "revenue": 0,
                         "count": 0
                     }
-                revenue_by_product[product_id]["revenue"] += payment["amount_usdc_minor"]
+                revenue_by_product[product_id]["revenue"] += payment["price_usdc_minor"]
                 revenue_by_product[product_id]["count"] += 1
         
         # Payments by status
@@ -256,12 +256,12 @@ async def get_vendor_analytics(
             created_at = _parse_timestamp(payment["created_at"])
             recent_activity.append({
                 "intent_id": payment["id"],
-                "amount_usdc_minor": payment["amount_usdc_minor"],
+                "price_usdc_minor": payment["price_usdc_minor"],
                 "status": payment["status"],
                 "product_name": payment["products"]["name"] if payment["products"] else "Unknown",
                 "created_at": created_at.isoformat(),
-                "src_chain_id": payment["src_chain_id"],
-                "dest_chain_id": payment["dest_chain_id"]
+                "destination_chain_id": payment["destination_chain_id"],
+                "destination_address": payment["destination_address"]
             })
         
         return AnalyticsSummary(

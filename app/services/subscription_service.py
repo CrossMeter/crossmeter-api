@@ -204,7 +204,9 @@ class SubscriptionService:
             "payment_intent": {
                 "intent_id": payment_intent.intent_id,
                 "status": payment_intent.status,
-                "amount_usdc_minor": payment_intent.amount_usdc_minor,
+                "price_usdc_minor": payment_intent.price_usdc_minor,
+                "destination_chain_id": payment_intent.destination_chain_id,
+                "destination_address": payment_intent.destination_address,
                 "router": {
                     "address": payment_intent.router.address,
                     "chain_id": payment_intent.router.chain_id,

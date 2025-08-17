@@ -2,8 +2,7 @@ from .payment_intent import (
     PaymentIntentCreate,
     PaymentIntentResponse,
     PaymentIntentUpdate,
-    RouterInfo,
-    TransactionHashUpdate,
+    TransactionCompleteUpdate,
 )
 from .subscription import (
     SubscriptionCreate,
@@ -21,8 +20,7 @@ __all__ = [
     "PaymentIntentCreate",
     "PaymentIntentResponse", 
     "PaymentIntentUpdate",
-    "RouterInfo",
-    "TransactionHashUpdate",
+    "TransactionCompleteUpdate",
     # Subscription schemas
     "SubscriptionCreate",
     "SubscriptionResponse",

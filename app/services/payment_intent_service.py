@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional
 from supabase import Client
 
 from app.database.client import get_database_client
@@ -8,12 +8,8 @@ from app.schemas.payment_intent import (
     PaymentIntentCreate,
     PaymentIntentResponse,
     PaymentIntentStatus,
-    RouterInfo,
-    TransactionHashUpdate
+    TransactionCompleteUpdate
 )
-from app.schemas.webhook import WebhookEventType
-from app.services.router_service import RouterService
-from app.services.webhook_service import send_payment_intent_webhook
 
 
 class PaymentIntentService:
@@ -21,7 +17,6 @@ class PaymentIntentService:
     
     def __init__(self, db_client: Optional[Client] = None):
         self.db = db_client or get_database_client()
-        self.router_service = RouterService()
     
     async def create_payment_intent(
         self, 
@@ -39,47 +34,35 @@ class PaymentIntentService:
         Raises:
             ValueError: If validation fails
         """
-        # Validate chain support
-        if not self.router_service.validate_chain_support(
-            payment_data.src_chain_id, 
-            payment_data.dest_chain_id
-        ):
-            raise ValueError(f"Unsupported chain combination: {payment_data.src_chain_id} -> {payment_data.dest_chain_id}")
-        
         # Generate unique intent ID
         intent_id = f"pi_{uuid.uuid4().hex[:12]}"
         
-        # Get vendor information to generate calldata
-        vendor_result = self.db.table("vendors").select("wallet_address, preferred_dest_chain_id, enabled_source_chains").eq("vendor_id", payment_data.vendor_id).execute()
+        # Get vendor information
+        vendor_result = self.db.table("vendors").select("wallet_address, preferred_dest_chain_id").eq("vendor_id", payment_data.vendor_id).execute()
         
         if not vendor_result.data:
             raise ValueError(f"Vendor not found: {payment_data.vendor_id}")
         
         vendor_data = vendor_result.data[0]
-        vendor_wallet = vendor_data["wallet_address"]
-        enabled_source_chains = vendor_data.get("enabled_source_chains", [])
+        destination_address = vendor_data["wallet_address"]
+        destination_chain_id = vendor_data["preferred_dest_chain_id"]
         
-        # Validate that the source chain is enabled for this vendor
-        if payment_data.src_chain_id not in enabled_source_chains:
-            raise ValueError(f"Source chain {payment_data.src_chain_id} is not enabled for vendor {payment_data.vendor_id}")
+        # Get product information
+        product_result = self.db.table("products").select("default_amount_usdc_minor, vendor_id").eq("product_id", payment_data.product_id).execute()
         
-        # Validate that chains are supported by our router
-        if not self.router_service.validate_chain_support(payment_data.src_chain_id, payment_data.dest_chain_id):
-            raise ValueError(f"Chain combination not supported: {payment_data.src_chain_id} -> {payment_data.dest_chain_id}")
+        if not product_result.data:
+            raise ValueError(f"Product not found: {payment_data.product_id}")
         
-        # Generate router calldata
-        router_info = self.router_service.generate_payment_calldata(
-            vendor_wallet=vendor_wallet,
-            amount_usdc_minor=payment_data.amount_usdc_minor,
-            src_chain_id=payment_data.src_chain_id,
-            dest_chain_id=payment_data.dest_chain_id,
-            payment_intent_id=intent_id
-        )
+        product_data = product_result.data[0]
         
-        # Handle customer creation/retrieval
-        customer_id = None
-        if payment_data.customer_email:
-            customer_id = await self._get_or_create_customer(payment_data.customer_email)
+        # Verify product belongs to vendor
+        if product_data["vendor_id"] != payment_data.vendor_id:
+            raise ValueError(f"Product {payment_data.product_id} does not belong to vendor {payment_data.vendor_id}")
+        
+        # Get price from product
+        price_usdc_minor = product_data["default_amount_usdc_minor"]
+        if price_usdc_minor is None:
+            raise ValueError(f"Product {payment_data.product_id} has no default price set")
         
         # Create payment intent record
         now = datetime.utcnow()
@@ -87,15 +70,10 @@ class PaymentIntentService:
             "intent_id": intent_id,
             "vendor_id": payment_data.vendor_id,
             "product_id": payment_data.product_id,
-            "customer_id": customer_id,
-            "customer_email": payment_data.customer_email,
-            "src_chain_id": payment_data.src_chain_id,
-            "dest_chain_id": payment_data.dest_chain_id,
-            "amount_usdc_minor": payment_data.amount_usdc_minor,
-            "status": PaymentIntentStatus.CREATED.value,  # Initially created, then immediately moved to awaiting_user_tx
-            "router_address": router_info["address"],
-            "router_function": router_info["function"],
-            "calldata_hex": router_info["calldata"],
+            "price_usdc_minor": price_usdc_minor,
+            "destination_chain_id": destination_chain_id,
+            "destination_address": destination_address,
+            "status": PaymentIntentStatus.CREATED.value,
             "created_at": now.isoformat(),
             "updated_at": now.isoformat()
         }
@@ -108,52 +86,18 @@ class PaymentIntentService:
         
         created_intent = result.data[0]
         
-        # Immediately update status to awaiting_user_tx since we're returning calldata to client
-        update_result = self.db.table("payment_intents").update({
-            "status": PaymentIntentStatus.AWAITING_USER_TX.value,
-            "updated_at": datetime.utcnow().isoformat()
-        }).eq("intent_id", intent_id).execute()
-        
-        if update_result.data:
-            created_intent = update_result.data[0]
-        
-        # Send webhook for payment intent creation
-        try:
-            await send_payment_intent_webhook(
-                vendor_id=payment_data.vendor_id,
-                event_type=WebhookEventType.PAYMENT_INTENT_CREATED,
-                intent_id=intent_id,
-                product_id=payment_data.product_id,
-                amount_usdc_minor=payment_data.amount_usdc_minor,
-                src_chain_id=payment_data.src_chain_id,
-                dest_chain_id=payment_data.dest_chain_id,
-                customer_email=payment_data.customer_email
-            )
-        except Exception as e:
-            # Log webhook error but don't fail the payment intent creation
-            print(f"Warning: Failed to send payment_intent.created webhook: {e}")
-        
         # Return response
         return PaymentIntentResponse(
             intent_id=intent_id,
             vendor_id=payment_data.vendor_id,
             product_id=payment_data.product_id,
-            status=PaymentIntentStatus.AWAITING_USER_TX,
-            src_chain_id=payment_data.src_chain_id,
-            dest_chain_id=payment_data.dest_chain_id,
-            amount_usdc_minor=payment_data.amount_usdc_minor,
-            customer_email=payment_data.customer_email,
-            src_tx_hash=None,
-            dest_tx_hash=None,
-            router=RouterInfo(
-                address=router_info["address"],
-                chain_id=router_info["chain_id"],
-                function=router_info["function"],
-                calldata=router_info["calldata"],
-                gas_limit=router_info.get("gas_limit"),
-                bridge_fee=router_info.get("bridge_fee"),
-                estimated_cost=router_info.get("estimated_cost")
-            ),
+            status=PaymentIntentStatus.CREATED,
+            price_usdc_minor=price_usdc_minor,
+            destination_chain_id=destination_chain_id,
+            destination_address=destination_address,
+            source_chain_id=None,
+            source_address=None,
+            transaction_hash=None,
             created_at=self._parse_timestamp(created_intent["created_at"]),
             updated_at=self._parse_timestamp(created_intent["updated_at"])
         )
@@ -174,50 +118,43 @@ class PaymentIntentService:
             return None
         
         intent_data = result.data[0]
-        
+
         return PaymentIntentResponse(
             intent_id=intent_data["intent_id"],
             vendor_id=intent_data["vendor_id"],
             product_id=intent_data["product_id"],
             status=PaymentIntentStatus(intent_data["status"]),
-            src_chain_id=intent_data["src_chain_id"],
-            dest_chain_id=intent_data["dest_chain_id"],
-            amount_usdc_minor=intent_data["amount_usdc_minor"],
-            customer_email=intent_data["customer_email"],
-            src_tx_hash=intent_data["src_tx_hash"],
-            dest_tx_hash=intent_data["dest_tx_hash"],
-            router=RouterInfo(
-                address=intent_data["router_address"],
-                chain_id=intent_data["src_chain_id"],
-                function=intent_data["router_function"],
-                calldata=intent_data["calldata_hex"],
-                gas_limit=None,  # Not stored in DB, would need to recalculate
-                bridge_fee=None,
-                estimated_cost=None
-            ),
+            price_usdc_minor=intent_data["price_usdc_minor"],
+            destination_chain_id=intent_data["destination_chain_id"],
+            destination_address=intent_data["destination_address"],
+            source_chain_id=intent_data.get("source_chain_id"),
+            source_address=intent_data.get("source_address"),
+            transaction_hash=intent_data.get("transaction_hash"),
             created_at=self._parse_timestamp(intent_data["created_at"]),
             updated_at=self._parse_timestamp(intent_data["updated_at"])
         )
     
-    async def update_source_transaction(
+    async def complete_transaction(
         self, 
         intent_id: str, 
-        tx_update: TransactionHashUpdate
+        transaction_update: TransactionCompleteUpdate
     ) -> Optional[PaymentIntentResponse]:
         """
-        Update payment intent with source transaction hash.
+        Complete a payment intent transaction with full transaction details.
         
         Args:
             intent_id: Payment intent identifier
-            tx_update: Transaction hash update data
+            transaction_update: Transaction completion data
             
         Returns:
             Updated PaymentIntentResponse or None if not found
         """
         # Update the record
         update_data = {
-            "src_tx_hash": tx_update.tx_hash,
-            "status": PaymentIntentStatus.SUBMITTED.value,
+            "transaction_hash": transaction_update.transaction_hash,
+            "source_chain_id": transaction_update.source_chain_id,
+            "source_address": transaction_update.source_address,
+            "status": transaction_update.payment_status.value,
             "updated_at": datetime.utcnow().isoformat()
         }
         
@@ -226,107 +163,8 @@ class PaymentIntentService:
         if not result.data:
             return None
         
-        # Send webhook for source transaction submission
-        updated_intent = await self.get_payment_intent(intent_id)
-        if updated_intent:
-            try:
-                await send_payment_intent_webhook(
-                    vendor_id=updated_intent.vendor_id,
-                    event_type=WebhookEventType.PAYMENT_INTENT_SUBMITTED,
-                    intent_id=intent_id,
-                    product_id=updated_intent.product_id,
-                    amount_usdc_minor=updated_intent.amount_usdc_minor,
-                    src_chain_id=updated_intent.src_chain_id,
-                    dest_chain_id=updated_intent.dest_chain_id,
-                    src_tx_hash=tx_update.tx_hash,
-                    customer_email=updated_intent.customer_email
-                )
-            except Exception as e:
-                print(f"Warning: Failed to send payment_intent.submitted webhook: {e}")
-        
         # Return updated intent
-        return updated_intent
-    
-    async def update_destination_transaction(
-        self, 
-        intent_id: str, 
-        tx_update: TransactionHashUpdate
-    ) -> Optional[PaymentIntentResponse]:
-        """
-        Update payment intent with destination transaction hash.
-        
-        Args:
-            intent_id: Payment intent identifier
-            tx_update: Transaction hash update data
-            
-        Returns:
-            Updated PaymentIntentResponse or None if not found
-        """
-        # Update the record
-        update_data = {
-            "dest_tx_hash": tx_update.tx_hash,
-            "status": PaymentIntentStatus.SETTLED.value,
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        result = self.db.table("payment_intents").update(update_data).eq("intent_id", intent_id).execute()
-        
-        if not result.data:
-            return None
-        
-        # Send webhook for destination transaction settlement
-        updated_intent = await self.get_payment_intent(intent_id)
-        if updated_intent:
-            try:
-                await send_payment_intent_webhook(
-                    vendor_id=updated_intent.vendor_id,
-                    event_type=WebhookEventType.PAYMENT_INTENT_SETTLED,
-                    intent_id=intent_id,
-                    product_id=updated_intent.product_id,
-                    amount_usdc_minor=updated_intent.amount_usdc_minor,
-                    src_chain_id=updated_intent.src_chain_id,
-                    dest_chain_id=updated_intent.dest_chain_id,
-                    src_tx_hash=updated_intent.src_tx_hash,
-                    dest_tx_hash=tx_update.tx_hash,
-                    customer_email=updated_intent.customer_email
-                )
-            except Exception as e:
-                print(f"Warning: Failed to send payment_intent.settled webhook: {e}")
-        
-        # Return updated intent
-        return updated_intent
-    
-    async def _get_or_create_customer(self, email: str) -> str:
-        """
-        Get existing customer or create new one.
-        
-        Args:
-            email: Customer email
-            
-        Returns:
-            str: Customer ID
-        """
-        # Try to find existing customer
-        result = self.db.table("customers").select("customer_id").eq("email", email).execute()
-        
-        if result.data:
-            return result.data[0]["customer_id"]
-        
-        # Create new customer
-        customer_id = f"cust_{uuid.uuid4().hex[:12]}"
-        customer_data = {
-            "customer_id": customer_id,
-            "email": email,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        create_result = self.db.table("customers").insert(customer_data).execute()
-        
-        if not create_result.data:
-            raise Exception("Failed to create customer")
-        
-        return customer_id
+        return await self.get_payment_intent(intent_id)
     
     def _parse_timestamp(self, timestamp_str: str) -> datetime:
         """
