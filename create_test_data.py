@@ -8,7 +8,7 @@ import asyncio
 import sys
 import os
 
-# Add the current directory to Python path
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.utils.test_data import create_test_data, create_additional_test_vendors
