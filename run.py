@@ -8,6 +8,9 @@ from app.core.config import settings
 
 
 
+
+print("This is an updated file")
+
 if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
